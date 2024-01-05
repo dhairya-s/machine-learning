@@ -1,0 +1,65 @@
+
+\begin{document}
+
+\subsection{Robust PCA Approximation and Gradient \pts{5}}
+
+If you run \verb| python main.py -q 1.3 |, the program will repeat the same procedure as in the above section, but will attempt to use the robust PCA method, whose objective functions are yet to be implemented. You will need to implement it (yay!).
+
+We'll use a gradient-based approach to PCA and a smooth approximation to the L1-norm. In this case the log-sum-exp approximation to the absolute value may be hard to get working due to numerical issues. Perhaps the Huber loss would work. We'll use the ``multi-quadric'' approximation:
+\[
+|\alpha| \approx \sqrt{\alpha^2 + \epsilon},
+\]
+where $\epsilon$ controls the accuracy of the approximation (a typical value of $\epsilon$ is $0.0001$). Note that when $\epsilon=0$ we revert back to the absolute value, but when $\epsilon>0$ the function becomes smooth.
+
+Our smoothed loss is:
+
+\[
+f(Z,W) = \sum_{i=1}^n\sum_{j=1}^d \sqrt{(\langle w^j, z_i\rangle - x_{ij})^2 + \epsilon }
+\]
+
+The partial derivatives of this loss with respect to the elements of $W$ are
+(\update{this derivation has been corrected since first posting, though the final answer was always right}):
+
+\begin{align*}
+\frac{\partial}{\partial w_{cj}} f(Z,W)
+  &= \frac{\partial}{\partial w_{cj}} \sum_{i=1}^n\sum_{j'=1}^d \left( (\langle w^{j'}, z_i\rangle - x_{ij'})^2 + \epsilon \right)^{\frac12} \\
+  &= \sum_{i=1}^n \frac{\partial}{\partial w_{cj}} \left( (\langle w^{j}, z_i\rangle - x_{ij})^2 + \epsilon \right)^{\frac12}  \qquad \text{(since the $j' \ne j$ terms have no $w_{cj}$ in them)} \\
+  &= \sum_{i=1}^n \frac12 \left( (\langle w^{j}, z_i\rangle - x_{ij})^2 + \epsilon \right)^{-\frac12} \frac{\partial}{\partial w_{cj}} \left( (\langle w^{j}, z_i\rangle - x_{ij})^2 + \epsilon \right) \\
+  &= \sum_{i=1}^n \frac12  \left( (\langle w^{j}, z_i\rangle - x_{ij})^2 + \epsilon \right)^{-\frac12} \;2\,  (\langle w^{j}, z_i\rangle - x_{ij}) \; \frac{\partial}{\partial w_{cj}} \langle w^{j}, z_i\rangle \\
+  &= \sum_{i=1}^n \left( (\langle w^{j}, z_i\rangle - x_{ij})^2 + \epsilon \right)^{-\frac12}  (\langle w^j, z_i\rangle - x_{ij}) \, z_{ic}
+\end{align*}
+
+The partial derivatives with respect to $Z$ are similar:
+
+\begin{align*}
+\frac{\partial}{\partial z_{ic}} f(Z,W)
+  &= \frac{\partial}{\partial z_{ic}} \sum_{i'=1}^n \sum_{j=1}^d  \left( (\langle w^j, z_{i'}\rangle - x_{i'j})^2 + \epsilon \right)^{\frac12}\\
+  &= \sum_{j=1}^d  \left( (\langle w^j, z_{i}\rangle - x_{ij})^2 + \epsilon \right)^{-\frac12}   (\langle w^j, z_{i}\rangle - x_{ij}) \; \frac{\partial}{\partial z_{ic}} \langle w^j, z_i\rangle \\
+  &= \sum_{j=1}^d  \left( (\langle w^j, z_i\rangle - x_{ij})^2 + \epsilon \right)^{-\frac12}  (\langle w^j, z_i\rangle - x_{ij}) \, w_{cj}
+\end{align*}
+
+If we put this into matrix(ish) notation, we get the following:
+
+\[
+\nabla_W f(Z,W) = Z^T \left[ R \oslash \left(R^{\circ 2} + \epsilon\right)^{\circ \frac12}  \right]
+\]
+
+where $R\equiv ZW-X$,
+$A \oslash B$ denotes \textbf{element-wise} division of $A$ and $B$,
+$A + s$ for a scalar $s$ denotes element-wise adding $s$ to each entry of $A$,
+and $A^{\circ p}$ denotes taking $A$ to the \textbf{element-wise} power of $p$.
+
+And, similarly, the gradient with respect to $Z$ is given by:
+
+\[
+\nabla_Z f(Z,W) = \left[ R \oslash \left(R^{\circ 2} + \epsilon\right)^{\circ \frac12} \right] W^T
+\]
+
+\ask{Show that the two parts of the gradient above, $\nabla_W f(Z,W)$ and $\nabla_Z f(Z,W)$, have the expected dimensions.}
+\begin{answer}
+	First, let's look at $\nabla_W f(Z,W)$. Since all computations in $\left[ R \oslash \left(R^{\circ 2} + \epsilon\right)^{\circ \frac12}  \right]$ is element-wise, the result of this part should be in the same dimension as $R$ and essentially the same as $X$, i.e. $n \times d$. We also know $Z^T$ is $k \times n$, so the final result should be a $k \times d$ matrix, which is the expected dimension since W is $k \times d$.
+
+	Similarly, for $\nabla_Z f(Z,W)$, $\left[ R \oslash \left(R^{\circ 2} + \epsilon\right)^{\circ \frac12} \right]$ will generate a $n \times d$ matrix. $W^T$ is $d \times k$. Therefore, the final result is $n \times k$, the same dimension as $Z$ as expected.
+\end{answer}
+
+\end{document}
